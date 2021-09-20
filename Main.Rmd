@@ -1,0 +1,167 @@
+---
+title: "EDA On Dept_37-00049"
+author: "Gurleen Singh Oberoi(2007161)"
+output:
+  html_document:
+    df_print: paged
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,message = FALSE, warning=FALSE)
+```
+
+
+```{r echo=FALSE}
+data = read.csv("C://Users//obero//Downloads//37-00049_UOF-P_2016_prepped.csv",na.strings = c(""))
+library(ggplot2)
+library(dplyr)
+library(lubridate)
+library(magrittr)
+library("gridExtra")
+data$OFFICER_YEARS_ON_FORCE <- as.numeric(as.character(data$OFFICER_YEARS_ON_FORCE))
+```
+
+# DATA DESCRIPTION
+Data provided is of incidents which were happened in Dallas,Texas in the year 2016.Data consists of  details of officers,subjects,time,location,date,injuries,race,offenses etc.
+Given data dimension = `r dim(data)`.
+```{r echo=FALSE}
+data = data[-1,]
+```
+Most committed crime = `r tail(names(sort(table(data$SUBJECT_OFFENSE))),1)`.
+Average years of officer on force = `r mean(data$OFFICER_YEARS_ON_FORCE)`
+
+# ANALYSIS
+
+```{r echo=FALSE}
+data$INCIDENT_DATE <- as.Date(data$INCIDENT_DATE, format = "%m/%d/%Y")
+data$INCIDENT_DATE <- gsub("00","20",data$INCIDENT_DATE)
+data$INCIDENT_DATE <- as.Date(data$INCIDENT_DATE, format = "%Y-%m-%d")
+data$INCIDENT_TIME <- format(strptime(data$INCIDENT_TIME, "%I:%M:%S %p"), "%H:%M:%S")
+data$INCIDENT_MONTH <- months(as.Date(data$INCIDENT_DATE))
+data$INC_MONTH <-format(data$INCIDENT_DATE,"%m")
+data$INCIDENT_HOUR <- as.numeric(substr(data$INCIDENT_TIME, 0, 2))
+data$INCIDENT_DAY <- wday(data$INCIDENT_DATE, label=TRUE)
+data$INC_HOUR <- substr(data$INCIDENT_TIME, 0, 2)
+data$INC_DATE <- substr(data$INCIDENT_DATE, 9, 10)
+
+
+year <-  data %>%
+  group_by(INCIDENT_DATE,INCIDENT_MONTH,INCIDENT_DAY) %>%
+  summarize(count = n())
+
+month <-  data %>%
+  group_by(INC_MONTH) %>%
+  summarize(count = n())
+
+day <-  data %>%
+  group_by(INCIDENT_DAY,INCIDENT_HOUR) %>%
+  summarize(count = n())
+
+data$INC_HOUR <- substr(data$INCIDENT_TIME, 0, 2)
+
+data   %>% group_by(INC_HOUR) %>%
+  summarize(avg =n()) -> hour_n
+
+
+
+plot_2 <- ggplot(month, aes(x=INC_MONTH, y =count, group=1)) + geom_line()  + geom_line( size = 1,colour ="black") + labs(x="MONTHS OF 2016", y= "INCIDENT COUNTS", title="MONTHS vs INCIDENT COUNTS")  + theme_bw()
+
+
+plot_3 <- ggplot(hour_n, aes(x = INC_HOUR, y = avg, group = "count")) + geom_line( size = 1, colour = "black") + labs(x="HOURS IN A DAY", y= "INCIDENT COUNTS", title="HOURS vs  INCIDENT COUNTS")+ theme_bw() +
+  theme(axis.text.x=element_text(angle=-90, vjust=0.5)) +
+  
+  labs(x = "Hour of the day", y = "count") + theme_bw()
+
+plot_4 <- ggplot(year, aes(count)) +
+  geom_density(alpha = 0.5, colour = "black", fill ="black")+ labs(x="INCIDENT COUNTS", y= "DENSITY", title="DISTRIBUTION OF INCIDENT RATES") + theme_bw()
+
+
+grid.arrange(plot_2,plot_4,plot_3,nrow=2)
+
+
+```
+
+##Observation:-
+Highest number of incidents occurred in the month of March and then reduction in number of incidents can be observed in the following months and lowest number of incidents occurred in the month of December.
+From distribution,peak of 3-4 incidents per day is observed.More than 20 incidents per day is rare.
+Maximum incidents occurred at 17:00 and 20:00.lowest incidents occurred at 07:00.
+Also in morning time between 04:00 and 10:00 incident counts is less.
+
+```{r echo=FALSE}
+ggplot(data, aes(x=DIVISION)) +
+  geom_bar(stat="count")+theme_classic()+scale_fill_brewer(palette = "Pastel1") + labs(x="Division",y= "Incident Counts", title="INCIDENT COUNTS IN DIFF. DIVISIONS")+coord_flip()
+```
+
+##Observation:-
+Maximum incidents were reported in Central Division followed by Southeast Division in Dallas and Lowest in Northwest. 
+
+```{r echo=FALSE}
+ data %>%
+  count(SUBJECT_DESCRIPTION) %>%
+  ggplot(aes(x = reorder(SUBJECT_DESCRIPTION, n),y = n)) + 
+  geom_col(fill="grey") + 
+  labs(x = "SUBJECT DESCRIPTION",
+       y = "COUNTS",
+       title = "SUBJECT DESCRIPTION") +
+  coord_flip() +
+  theme_minimal()
+   
+   
+```
+
+##Observation:-
+Mostly Subject was described Mentally unstable followed by Alcoholic.
+
+```{r echo=FALSE}
+ggplot(data, aes(x=SUBJECT_RACE, fill=SUBJECT_GENDER)) +
+  geom_bar(stat="count")+theme_classic()+scale_fill_brewer(palette = "Pastel1")
+
+```
+
+```{r echo=FALSE}
+ggplot(data, aes(x=OFFICER_RACE, fill=OFFICER_GENDER)) +
+  geom_bar(stat="count")+theme_classic()+scale_fill_brewer(palette = "Pastel1")
+
+```
+
+##Observation:-
+Top three races committing incidents Blacks,Whites and Hispanics.
+Top three races handling incidents Whites,Hispanics and Blacks
+
+```{r echo=FALSE}
+subject <-  data %>%
+  group_by(INC_MONTH,INCIDENT_MONTH,SUBJECT_RACE) %>%
+  summarize(count = n())
+
+officer <-  data %>%
+  group_by(INC_MONTH,INCIDENT_MONTH,OFFICER_RACE) %>%
+  summarize(count = n())
+
+
+
+c1 <- ggplot() +
+  geom_line(data=subset(subject, SUBJECT_RACE=="Black" ) ,aes(y=count,x= INC_MONTH,colour="black",group=1),size=1 ) +
+  geom_line(data=subset(subject, SUBJECT_RACE=="Hispanic" ) ,aes(y=count,x= INC_MONTH,colour="Hispanic",group=1),size=1 ) +
+  geom_line(data=subset(subject, SUBJECT_RACE=="White" ) ,aes(y=count,x= INC_MONTH,colour="white",group=1),size=1 ) +
+   labs(x="Months of 2016", y= "Incident Counts", title=" Sub.Race vs Incidents")  +scale_color_viridis_d()+
+     theme(axis.text.x=element_text( vjust=0.5),legend.position="bottom") +guides(colour=guide_legend(nrow=2))
+
+
+c2 <- ggplot() +
+  geom_line(data=subset(officer, OFFICER_RACE=="Black" ) ,aes(y=count,x= INC_MONTH,colour="black",group=1),size=1 ) +
+  geom_line(data=subset(officer, OFFICER_RACE=="Hispanic" ) ,aes(y=count,x= INC_MONTH,colour="Hispanic",group=1),size=1 ) +
+  geom_line(data=subset(officer, OFFICER_RACE=="White" ) ,aes(y=count,x= INC_MONTH,colour="White",group=1),size=1 ) +
+  labs(x="Months of 2016",y= "Incident Counts", title=" Off.Race vs Incident Handled")  + scale_color_viridis_d()+
+  theme(axis.text.x=element_text( vjust=0.5),legend.position="bottom")+guides(colour=guide_legend(nrow=2))
+
+
+grid.arrange(c1,c2,ncol=2)
+
+
+
+```
+
+##Observation:-
+Blacks are committing more incidents across the year compared to Whites and Hispanics.Incidents committed by blacks is high in march.White officer handling incidents in march is also high.A decline in incidents committed by blacks and hispanics over the year is observed.Not significant Variation is observed in incident counts committed by whites over the year.Black officer handled less incidents compared to hispanics and whites.It can be concluded that there is high probability that a white officer will handle incident case of black subject.
